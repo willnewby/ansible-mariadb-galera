@@ -7,6 +7,17 @@
 - name: punch a hole for mysql
   firewalld: port=3306/tcp permanent=true state=enabled immediate=yes
 
+- name: punch a hole for galera
+  firewalld: port=4567/tcp permanent=true state=enabled immediate=yes
+
+- name: punch a hole for rsync SST
+  firewalld: port=4444/tcp permanent=true state=enabled immediate=yes
+
+- name: setting selinux permissive for now
+  selinux:
+    policy: targeted
+    state: permissive
+
 - name: deploy MariaDB.repo
   copy: src=MariaDB.repo dest=/etc/yum.repos.d/MariaDB.repo owner=root group=root mode=0644
 
@@ -19,29 +30,26 @@
     - MariaDB-server
     - MariaDB-client
 
-- name: deploy server.conf to the primary server
-  copy: src=server.conf dest=/etc/my.cnf.d/server.cnf
-  when: role == "primary"
-
-- name: deploy server.conf.j2 to the other servers
+- name: deploy server.conf.j2
   template: src=server.conf.j2 dest=/etc/my.cnf.d/server.cnf
-  when: role != "primary"
+  notify: restart mariadb
 
 - name: run galera_new_cluster on the primary node
   shell: galera_new_cluster creates=/var/lib/mysql/galera.cache
-  when: role == "primary"
+  when: maria_cluster_role == "primary"
 
-- name: grab selinux modules
-  shell: semodule -l
-  register: selinuxmodules
 
-- name: deploy mysqld-tmp.pp
-  copy: src=mysqld-tmp.pp dest=/tmp/mysqld-tmp.pp owner=root group=root mode=600
-  when: "selinuxmodules.stdout.find('mysqld-tmp') == -1"
+#- name: grab selinux modules
+#  shell: semodule -l
+#  register: selinuxmodules
 
-- name: load mysqld-tmp.pp
-  command: semodule -i /tmp/mysqld-tmp.pp
-  when: "selinuxmodules.stdout.find('mysqld-tmp') == -1"
+#- name: deploy mysqld-tmp.pp
+#  copy: src=mysqld-tmp.pp dest=/tmp/mysqld-tmp.pp owner=root group=root mode=600
+#  when: "selinuxmodules.stdout.find('mysqld-tmp') == -1"
+
+#- name: load mysqld-tmp.pp
+#  command: semodule -i /tmp/mysqld-tmp.pp
+#  when: "selinuxmodules.stdout.find('mysqld-tmp') == -1"
 
 - name: start and enable mysqld
   service: name=mysql state=started enabled=yes
@@ -50,9 +58,7 @@
   shell: mysql -u root -e "SHOW GLOBAL STATUS WHERE Variable_name IN ('wsrep_ready', 'wsrep_cluster_size', 'wsrep_cluster_status', 'wsrep_connected');"
   register: cluster_status
   changed_when: false
-  when: role == "primary"
 
 - name: show cluster status
   debug: msg="{{ cluster_status.stdout_lines }}"
   changed_when: false
-  when: role == "primary"

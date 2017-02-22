@@ -11,29 +11,38 @@
 # this is only for the mysqld standalone daemon
 [mysqld]
 
-#
-# * Galera-related settings
-#
-[galera]
-# Mandatory settings
+# SAFETY #
+max-allowed-packet             = 16M
+max-connect-errors             = 1000000
+skip-name-resolve
+# https://www.percona.com/blog/2008/05/31/dns-achilles-heel-mysql-installation/
+skip_name_resolve
+
+
+# LOGGING #
+log-error                      = /var/lib/mysql/mysql-error.log
+log-queries-not-using-indexes  = 1
+slow-query-log                 = 1
+slow-query-log-file            = /var/lib/mysql/mysql-slow.log
+
+# GALERA #
+#[galera]
 wsrep_on=ON
 wsrep_provider=/usr/lib64/galera/libgalera_smm.so
-wsrep_cluster_address=gcomm://{{ primary }}
+wsrep_cluster_name="{{ maria_cluster_name }}"
+wsrep_cluster_address=gcomm://{{ maria_cluster_list }}
+wsrep_node_name={{ maria_host_name }}
+wsrep_node_address={{ maria_host_ip }}
+wsrep_slave_threads=1
+wsrep_sst_method = rsync
+
 binlog_format=ROW
 default_storage_engine=InnoDB
 innodb_autoinc_lock_mode=2
-#query_cache_size=0
-#
-# Allow server to accept connections on all interfaces.
-#
-#bind-address=0.0.0.0
-#
-# Optional setting
-#wsrep_slave_threads=1
-#innodb_flush_log_at_trx_commit=0
 
-# this is only for embedded server
-[embedded]
+#query_cache_size=0
+bind-address=0.0.0.0
+
 
 # This group is only read by MariaDB servers, not by MySQL.
 # If you use the same .cnf file for MySQL and MariaDB,

@@ -1,2 +1,6 @@
 ---
 # handlers file for ansible-mariadb-galera
+- name: restart mariadb
+  service:
+      name: mariadb
+      state: restarted
